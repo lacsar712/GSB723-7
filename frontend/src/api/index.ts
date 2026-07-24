@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { message } from 'ant-design-vue'
+import router from '../router'
 
 const api = axios.create({
   baseURL: '',
@@ -27,6 +28,10 @@ api.interceptors.response.use(
       message.error('登录已过期，请重新登录')
     } else if (status === 403) {
       message.error(detail || '没有权限执行此操作')
+      const currentPath = window.location.pathname
+      if (currentPath.startsWith('/admin')) {
+        router.push('/dashboard')
+      }
     } else if (status === 404) {
       message.error(detail || '请求的资源不存在')
     } else if (status >= 500) {

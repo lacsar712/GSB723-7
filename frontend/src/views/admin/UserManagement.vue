@@ -15,10 +15,10 @@
               {{ record.role }}
             </a-tag>
           </template>
-          <template v-else-if="column.key === 'status'">
+          <template v-else-if="column.key === 'is_active'">
             <a-badge
-              :status="record.status === 'active' ? 'success' : 'default'"
-              :text="record.status === 'active' ? '活跃' : '停用'"
+              :status="record.is_active ? 'success' : 'default'"
+              :text="record.is_active ? '启用' : '停用'"
             />
           </template>
           <template v-else-if="column.key === 'created_at'">
@@ -34,19 +34,10 @@
 import { ref, onMounted } from 'vue'
 import api from '../../api'
 import { formatDateTime } from '../../utils/format'
-
-interface AdminUser {
-  id: string
-  username: string
-  display_name?: string
-  role: 'admin' | 'trader' | 'viewer'
-  department?: string
-  status: 'active' | 'inactive'
-  created_at?: string
-}
+import type { AdminUserItem } from '../../types'
 
 const loading = ref(false)
-const users = ref<AdminUser[]>([])
+const users = ref<AdminUserItem[]>([])
 
 function roleColor(role: string): string {
   const map: Record<string, string> = {
@@ -62,16 +53,16 @@ const columns = [
   { title: '显示名称', dataIndex: 'display_name', key: 'display_name', width: 120 },
   { title: '角色', key: 'role', dataIndex: 'role', width: 100 },
   { title: '部门', dataIndex: 'department', key: 'department' },
-  { title: '状态', key: 'status', dataIndex: 'status', width: 100 },
+  { title: '状态', key: 'is_active', dataIndex: 'is_active', width: 100 },
   { title: '创建时间', key: 'created_at', dataIndex: 'created_at', width: 180 },
 ]
 
 async function fetchUsers() {
   loading.value = true
   try {
-    const res = await api.get<AdminUser[] | { items: AdminUser[] }>('/api/admin/users')
+    const res = await api.get<AdminUserItem[] | { items: AdminUserItem[] }>('/api/admin/users')
     const data = res.data
-    users.value = Array.isArray(data) ? data : (data as { items: AdminUser[] }).items ?? []
+    users.value = Array.isArray(data) ? data : (data as { items: AdminUserItem[] }).items ?? []
   } catch {
     users.value = []
   } finally {

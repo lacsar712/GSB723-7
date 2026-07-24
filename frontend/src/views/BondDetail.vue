@@ -209,76 +209,17 @@ import {
   formatDateTime,
   sourceTypeLabel,
 } from '../utils/format'
-
-interface Bond {
-  id: string
-  code: string
-  name: string
-  bond_type: string
-  issuer: string
-  coupon_rate?: number
-  remaining_term?: number
-  credit_rating?: string
-}
-
-interface SourceSummary {
-  source_name: string
-  source_type: string
-  best_bid_price?: number
-  best_ask_price?: number
-  best_bid_yield?: number
-  best_ask_yield?: number
-  quote_count: number
-  latest_quote_time?: string
-}
-
-interface Aggregated {
-  bond: Bond
-  sources: SourceSummary[]
-  best_bid_price?: number
-  best_ask_price?: number
-  best_bid_yield?: number
-  best_ask_yield?: number
-  spread?: number
-  total_quotes: number
-}
-
-interface Quote {
-  id: string
-  source_name?: string
-  source_type?: string
-  bid_price?: number
-  ask_price?: number
-  bid_yield?: number
-  ask_yield?: number
-  bid_volume?: number
-  ask_volume?: number
-  counterparty?: string
-  quote_time?: string
-}
-
-interface Trade {
-  id: string
-  source_name?: string
-  source_type?: string
-  price: number
-  yield_rate?: number
-  volume: number
-  amount?: number
-  direction: string
-  counterparty?: string
-  trade_time?: string
-}
+import type { BondItem, AggregatedQuoteItem, QuoteItem, TradeItem } from '../types'
 
 const route = useRoute()
 const bondId = computed(() => route.params.id as string)
 
 const loading = ref(true)
 const error = ref(false)
-const bond = ref<Bond | null>(null)
-const aggregated = ref<Aggregated | null>(null)
-const quotes = ref<Quote[]>([])
-const trades = ref<Trade[]>([])
+const bond = ref<BondItem | null>(null)
+const aggregated = ref<AggregatedQuoteItem | null>(null)
+const quotes = ref<QuoteItem[]>([])
+const trades = ref<TradeItem[]>([])
 const favorites = ref<string[]>([])
 const favLoading = ref(false)
 const activeTab = ref('sources')
@@ -327,11 +268,11 @@ async function fetchData() {
   error.value = false
   try {
     const [bondRes, aggRes, quotesRes, tradesRes, favRes] = await Promise.all([
-      api.get<Bond>(`/api/bonds/${bondId.value}`),
-      api.get<Aggregated>(`/api/bonds/${bondId.value}/aggregated`),
-      api.get<Quote[]>(`/api/bonds/${bondId.value}/quotes`),
-      api.get<Trade[]>(`/api/bonds/${bondId.value}/trades`),
-      api.get<Bond[]>('/api/favorites'),
+      api.get<BondItem>(`/api/bonds/${bondId.value}`),
+      api.get<AggregatedQuoteItem>(`/api/bonds/${bondId.value}/aggregated`),
+      api.get<QuoteItem[]>(`/api/bonds/${bondId.value}/quotes`),
+      api.get<TradeItem[]>(`/api/bonds/${bondId.value}/trades`),
+      api.get<BondItem[]>('/api/favorites'),
     ])
     bond.value = bondRes.data
     aggregated.value = aggRes.data
