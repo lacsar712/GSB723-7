@@ -17,6 +17,10 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/api/bonds", tags=["债券"])
 
 
+def _enabled_source_filter():
+    return MarketSource.is_enabled.is_(True)
+
+
 @router.get("", response_model=BondListOut)
 async def list_bonds(
     keyword: Optional[str] = Query(None, description="搜索关键词"),
@@ -74,6 +78,7 @@ async def get_bond_quotes(bond_id: UUID, db: AsyncSession = Depends(get_db), _us
         select(Quote, MarketSource.name, MarketSource.source_type)
         .join(MarketSource, Quote.source_id == MarketSource.id)
         .where(Quote.bond_id == bond_id)
+        .where(_enabled_source_filter())
         .order_by(Quote.quote_time.desc())
         .limit(100)
     )
@@ -95,6 +100,7 @@ async def get_bond_trades(bond_id: UUID, db: AsyncSession = Depends(get_db), _us
         .join(MarketSource, Trade.source_id == MarketSource.id)
         .join(Bond, Trade.bond_id == Bond.id)
         .where(Trade.bond_id == bond_id)
+        .where(_enabled_source_filter())
         .order_by(Trade.trade_time.desc())
         .limit(100)
     )
@@ -131,6 +137,7 @@ async def get_aggregated_quotes(bond_id: UUID, db: AsyncSession = Depends(get_db
         )
         .join(MarketSource, Quote.source_id == MarketSource.id)
         .where(Quote.bond_id == bond_id)
+        .where(_enabled_source_filter())
         .group_by(MarketSource.name, MarketSource.source_type)
     )
     source_rows = quotes_result.all()
