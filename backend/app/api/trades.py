@@ -13,6 +13,10 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/api/trades", tags=["成交"])
 
 
+def _enabled_source_filter():
+    return MarketSource.is_enabled.is_(True)
+
+
 @router.get("/recent", response_model=TradeListOut)
 async def get_recent_trades(
     source_type: Optional[str] = Query(None),
@@ -26,20 +30,21 @@ async def get_recent_trades(
         select(Trade, MarketSource.name, MarketSource.source_type, Bond.code, Bond.name.label("bname"))
         .join(MarketSource, Trade.source_id == MarketSource.id)
         .join(Bond, Trade.bond_id == Bond.id)
+        .where(_enabled_source_filter())
     )
-    count_query = select(func.count(Trade.id))
+    count_query = (
+        select(func.count(Trade.id))
+        .join(MarketSource, Trade.source_id == MarketSource.id)
+        .join(Bond, Trade.bond_id == Bond.id)
+        .where(_enabled_source_filter())
+    )
 
     if source_type:
         query = query.where(MarketSource.source_type == source_type)
-        count_query = count_query.join(MarketSource, Trade.source_id == MarketSource.id).where(
-            MarketSource.source_type == source_type
-        )
+        count_query = count_query.where(MarketSource.source_type == source_type)
     if bond_type:
         query = query.where(Bond.bond_type == bond_type)
-        if source_type:
-            count_query = count_query.join(Bond, Trade.bond_id == Bond.id).where(Bond.bond_type == bond_type)
-        else:
-            count_query = count_query.join(Bond, Trade.bond_id == Bond.id).where(Bond.bond_type == bond_type)
+        count_query = count_query.where(Bond.bond_type == bond_type)
 
     total_result = await db.execute(count_query)
     total = total_result.scalar()

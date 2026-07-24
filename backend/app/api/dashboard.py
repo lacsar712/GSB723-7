@@ -6,22 +6,43 @@ from app.database import get_db
 from app.models.bond import Bond, MarketSource
 from app.models.quote import Quote
 from app.models.trade import Trade
-from app.models.futures import FuturesQuote
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/api/dashboard", tags=["看板"])
+
+
+def _enabled_source_filter():
+    return MarketSource.is_enabled.is_(True)
 
 
 @router.get("/overview")
 async def get_overview(db: AsyncSession = Depends(get_db), _user=Depends(get_current_user)):
     bond_count = await db.execute(select(func.count(Bond.id)))
     source_count = await db.execute(
-        select(func.count(MarketSource.id)).where(MarketSource.status == "online")
+        select(func.count(MarketSource.id))
+        .where(MarketSource.status == "online")
+        .where(_enabled_source_filter())
     )
-    quote_count = await db.execute(select(func.count(Quote.id)))
-    trade_count = await db.execute(select(func.count(Trade.id)))
-    trade_volume = await db.execute(select(func.sum(Trade.volume)))
-    trade_amount = await db.execute(select(func.sum(Trade.amount)))
+    quote_count = await db.execute(
+        select(func.count(Quote.id))
+        .join(MarketSource, Quote.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
+    )
+    trade_count = await db.execute(
+        select(func.count(Trade.id))
+        .join(MarketSource, Trade.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
+    )
+    trade_volume = await db.execute(
+        select(func.sum(Trade.volume))
+        .join(MarketSource, Trade.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
+    )
+    trade_amount = await db.execute(
+        select(func.sum(Trade.amount))
+        .join(MarketSource, Trade.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
+    )
 
     return {
         "bond_count": bond_count.scalar() or 0,
@@ -38,9 +59,11 @@ async def get_yield_curve(db: AsyncSession = Depends(get_db), _user=Depends(get_
     result = await db.execute(
         select(Bond.remaining_term, func.avg(Quote.bid_yield).label("avg_yield"))
         .join(Quote, Bond.id == Quote.bond_id)
+        .join(MarketSource, Quote.source_id == MarketSource.id)
         .where(Bond.bond_type == "国债")
         .where(Bond.remaining_term.isnot(None))
         .where(Quote.bid_yield.isnot(None))
+        .where(_enabled_source_filter())
         .group_by(Bond.remaining_term)
         .order_by(Bond.remaining_term)
     )
@@ -61,6 +84,8 @@ async def get_hot_bonds(db: AsyncSession = Depends(get_db), _user=Depends(get_cu
             func.count(Trade.id).label("trade_cnt"),
         )
         .join(Trade, Bond.id == Trade.bond_id)
+        .join(MarketSource, Trade.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
         .group_by(Bond.id, Bond.code, Bond.name, Bond.bond_type)
         .order_by(desc("total_vol"))
         .limit(10)
@@ -91,6 +116,8 @@ async def get_alerts(db: AsyncSession = Depends(get_db), _user=Depends(get_curre
             func.min(Quote.ask_yield).label("min_yield"),
         )
         .join(Quote, Bond.id == Quote.bond_id)
+        .join(MarketSource, Quote.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
         .group_by(Bond.id, Bond.code, Bond.name)
         .limit(15)
     )

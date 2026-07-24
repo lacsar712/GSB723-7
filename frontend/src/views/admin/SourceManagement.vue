@@ -10,8 +10,8 @@
         :row-key="(r) => r.id"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'type'">
-            <a-tag>{{ sourceTypeLabel(record.type) }}</a-tag>
+          <template v-if="column.key === 'source_type'">
+            <a-tag>{{ sourceTypeLabel(record.source_type) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'status'">
             <a-badge
@@ -19,10 +19,11 @@
               :text="sourceStatusText(record.status)"
             />
           </template>
-          <template v-else-if="column.key === 'enabled'">
+          <template v-else-if="column.key === 'is_enabled'">
             <a-switch
-              :checked="record.enabled"
-              @change="(checked) => handleToggleEnabled(record.id, !!checked)"
+              :checked="record.is_enabled"
+              :loading="!!updatingId[record.id]"
+              @change="(checked) => handleToggleEnabled(record, !!checked)"
             />
           </template>
         </template>
@@ -33,20 +34,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { message } from 'ant-design-vue'
 import api from '../../api'
 import { sourceTypeLabel } from '../../utils/format'
-
-interface SourceItem {
-  id: string
-  name: string
-  type: string
-  status: 'online' | 'offline' | 'error'
-  description?: string
-  enabled: boolean
-}
+import { mapSource, mapSourceList, type MarketSourceVM } from '../../utils/adapter'
 
 const loading = ref(false)
-const sources = ref<SourceItem[]>([])
+const sources = ref<MarketSourceVM[]>([])
+const updatingId = ref<Record<string, boolean>>({})
 
 function sourceStatusBadge(status: string): 'success' | 'warning' | 'error' | 'default' {
   const map: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
@@ -67,19 +62,18 @@ function sourceStatusText(status: string): string {
 }
 
 const columns = [
-  { title: '名称', dataIndex: 'name', key: 'name', width: 140 },
-  { title: '类型', key: 'type', dataIndex: 'type', width: 120 },
+  { title: '名称', dataIndex: 'name', key: 'name', width: 160 },
+  { title: '类型', key: 'source_type', dataIndex: 'source_type', width: 140 },
   { title: '状态', key: 'status', dataIndex: 'status', width: 100 },
   { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
-  { title: '是否启用', key: 'enabled', dataIndex: 'enabled', width: 100 },
+  { title: '是否启用', key: 'is_enabled', dataIndex: 'is_enabled', width: 100 },
 ]
 
 async function fetchSources() {
   loading.value = true
   try {
-    const res = await api.get<SourceItem[] | { items: SourceItem[] }>('/api/admin/sources')
-    const data = res.data
-    sources.value = Array.isArray(data) ? data : (data as { items: SourceItem[] }).items ?? []
+    const res = await api.get('/api/admin/sources')
+    sources.value = mapSourceList(res.data)
   } catch {
     sources.value = []
   } finally {
@@ -87,13 +81,20 @@ async function fetchSources() {
   }
 }
 
-async function handleToggleEnabled(id: string, enabled: boolean) {
+async function handleToggleEnabled(record: MarketSourceVM, enabled: boolean) {
+  updatingId.value[record.id] = true
   try {
-    await api.put(`/api/admin/sources/${id}`, { enabled })
-    const item = sources.value.find((s) => s.id === id)
-    if (item) item.enabled = enabled
+    const res = await api.put(`/api/admin/sources/${record.id}`, { is_enabled: enabled })
+    const updated = mapSource(res.data as Record<string, unknown>)
+    const idx = sources.value.findIndex((s) => s.id === record.id)
+    if (idx >= 0) {
+      sources.value[idx] = { ...sources.value[idx], ...updated }
+    }
+    message.success(enabled ? '已启用该行情源' : '已禁用该行情源')
   } catch {
     // 错误由 api 拦截器处理
+  } finally {
+    updatingId.value[record.id] = false
   }
 }
 

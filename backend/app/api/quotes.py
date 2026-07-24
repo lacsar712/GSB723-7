@@ -13,6 +13,10 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/api/quotes", tags=["报价"])
 
 
+def _enabled_source_filter():
+    return MarketSource.is_enabled.is_(True)
+
+
 @router.get("/latest", response_model=list[QuoteOut])
 async def get_latest_quotes(
     source_type: Optional[str] = Query(None),
@@ -23,6 +27,7 @@ async def get_latest_quotes(
     query = (
         select(Quote, MarketSource.name, MarketSource.source_type)
         .join(MarketSource, Quote.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
     )
     if source_type:
         query = query.where(MarketSource.source_type == source_type)
@@ -54,6 +59,8 @@ async def get_best_quotes(
             func.min(Quote.ask_price).label("best_ask"),
             func.count(Quote.id).label("quote_count"),
         )
+        .join(MarketSource, Quote.source_id == MarketSource.id)
+        .where(_enabled_source_filter())
         .group_by(Quote.bond_id)
         .subquery()
     )
