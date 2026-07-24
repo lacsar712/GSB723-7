@@ -26,20 +26,22 @@ async def get_recent_trades(
         select(Trade, MarketSource.name, MarketSource.source_type, Bond.code, Bond.name.label("bname"))
         .join(MarketSource, Trade.source_id == MarketSource.id)
         .join(Bond, Trade.bond_id == Bond.id)
+        .where(MarketSource.is_enabled == True)
     )
-    count_query = select(func.count(Trade.id))
+    count_query = (
+        select(func.count(Trade.id))
+        .join(MarketSource, Trade.source_id == MarketSource.id)
+        .where(MarketSource.is_enabled == True)
+    )
 
     if source_type:
         query = query.where(MarketSource.source_type == source_type)
-        count_query = count_query.join(MarketSource, Trade.source_id == MarketSource.id).where(
-            MarketSource.source_type == source_type
-        )
+        count_query = count_query.where(MarketSource.source_type == source_type)
     if bond_type:
         query = query.where(Bond.bond_type == bond_type)
-        if source_type:
-            count_query = count_query.join(Bond, Trade.bond_id == Bond.id).where(Bond.bond_type == bond_type)
-        else:
-            count_query = count_query.join(Bond, Trade.bond_id == Bond.id).where(Bond.bond_type == bond_type)
+        count_query = count_query.join(Bond, Trade.bond_id == Bond.id).where(Bond.bond_type == bond_type)
+    elif source_type:
+        count_query = count_query.join(Bond, Trade.bond_id == Bond.id)
 
     total_result = await db.execute(count_query)
     total = total_result.scalar()
@@ -75,6 +77,8 @@ async def get_trade_statistics(
             func.avg(Trade.price).label("avg_p"),
             func.avg(Trade.yield_rate).label("avg_y"),
         )
+        .join(MarketSource, Trade.source_id == MarketSource.id)
+        .where(MarketSource.is_enabled == True)
     )
     stats = stats_result.one()
 
@@ -87,6 +91,7 @@ async def get_trade_statistics(
             func.count(Trade.id).label("cnt"),
         )
         .join(MarketSource, Trade.source_id == MarketSource.id)
+        .where(MarketSource.is_enabled == True)
         .group_by(MarketSource.name, MarketSource.source_type)
     )
 
@@ -97,7 +102,10 @@ async def get_trade_statistics(
             func.sum(Trade.amount).label("amt"),
             func.count(Trade.id).label("cnt"),
         )
+        .select_from(Trade)
+        .join(MarketSource, Trade.source_id == MarketSource.id)
         .join(Bond, Trade.bond_id == Bond.id)
+        .where(MarketSource.is_enabled == True)
         .group_by(Bond.bond_type)
     )
 

@@ -8,6 +8,7 @@ interface UserInfo {
   display_name: string
   role: string
   department: string | null
+  is_active: boolean
 }
 
 export const useAuthStore = defineStore('auth', () => {
