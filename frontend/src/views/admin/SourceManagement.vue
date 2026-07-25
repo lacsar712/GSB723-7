@@ -11,7 +11,7 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'type'">
-            <a-tag>{{ sourceTypeLabel(record.type) }}</a-tag>
+            <a-tag>{{ sourceTypeLabel(record.sourceType) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'status'">
             <a-badge
@@ -21,7 +21,7 @@
           </template>
           <template v-else-if="column.key === 'enabled'">
             <a-switch
-              :checked="record.enabled"
+              :checked="record.isEnabled"
               @change="(checked) => handleToggleEnabled(record.id, !!checked)"
             />
           </template>
@@ -35,15 +35,8 @@
 import { ref, onMounted } from 'vue'
 import api from '../../api'
 import { sourceTypeLabel } from '../../utils/format'
-
-interface SourceItem {
-  id: string
-  name: string
-  type: string
-  status: 'online' | 'offline' | 'error'
-  description?: string
-  enabled: boolean
-}
+import { adaptSource, toSourceUpdatePayload } from '../../types'
+import type { SourceItem, SourceRaw } from '../../types'
 
 const loading = ref(false)
 const sources = ref<SourceItem[]>([])
@@ -68,18 +61,19 @@ function sourceStatusText(status: string): string {
 
 const columns = [
   { title: '名称', dataIndex: 'name', key: 'name', width: 140 },
-  { title: '类型', key: 'type', dataIndex: 'type', width: 120 },
-  { title: '状态', key: 'status', dataIndex: 'status', width: 100 },
+  { title: '类型', key: 'type', width: 120 },
+  { title: '状态', key: 'status', width: 100 },
   { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
-  { title: '是否启用', key: 'enabled', dataIndex: 'enabled', width: 100 },
+  { title: '是否启用', key: 'enabled', width: 100 },
 ]
 
 async function fetchSources() {
   loading.value = true
   try {
-    const res = await api.get<SourceItem[] | { items: SourceItem[] }>('/api/admin/sources')
+    const res = await api.get<SourceRaw[] | { items: SourceRaw[] }>('/api/admin/sources')
     const data = res.data
-    sources.value = Array.isArray(data) ? data : (data as { items: SourceItem[] }).items ?? []
+    const list = Array.isArray(data) ? data : (data as { items: SourceRaw[] }).items ?? []
+    sources.value = list.map(adaptSource)
   } catch {
     sources.value = []
   } finally {
@@ -87,11 +81,11 @@ async function fetchSources() {
   }
 }
 
-async function handleToggleEnabled(id: string, enabled: boolean) {
+async function handleToggleEnabled(id: string, isEnabled: boolean) {
   try {
-    await api.put(`/api/admin/sources/${id}`, { enabled })
+    await api.put(`/api/admin/sources/${id}`, toSourceUpdatePayload({ isEnabled }))
     const item = sources.value.find((s) => s.id === id)
-    if (item) item.enabled = enabled
+    if (item) item.isEnabled = isEnabled
   } catch {
     // 错误由 api 拦截器处理
   }

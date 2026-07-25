@@ -68,15 +68,15 @@
             </router-link>
           </template>
           <template v-else-if="column.key === 'type'">
-            <a-tag :color="bondTypeColor(record.type)">
-              {{ record.type }}
+            <a-tag :color="bondTypeColor(record.bondType)">
+              {{ record.bondType }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'coupon_rate'">
-            <span class="tabular-nums">{{ record.coupon_rate != null ? `${record.coupon_rate}%` : '--' }}</span>
+            <span class="tabular-nums">{{ record.couponRate != null ? `${record.couponRate}%` : '--' }}</span>
           </template>
           <template v-else-if="column.key === 'remaining_term'">
-            <span class="tabular-nums">{{ record.remaining_term ?? '--' }}</span>
+            <span class="tabular-nums">{{ record.remainingTerm ?? '--' }}</span>
           </template>
         </template>
       </a-table>
@@ -102,27 +102,18 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import api from '../api'
 import { bondTypeColor } from '../utils/format'
 import { BOND_TYPES, CREDIT_RATINGS } from '../utils/constants'
-
-interface Bond {
-  id: string
-  code: string
-  name: string
-  type: string
-  coupon_rate?: number
-  remaining_term?: string
-  rating?: string
-  issuer?: string
-}
+import { adaptBond } from '../types'
+import type { BondItem, BondRaw } from '../types'
 
 interface BondsResponse {
-  items: Bond[]
+  items: BondRaw[]
   total: number
   page?: number
   page_size?: number
 }
 
 const loading = ref(false)
-const bonds = ref<Bond[]>([])
+const bonds = ref<BondItem[]>([])
 const filters = reactive({
   keyword: '',
   bond_type: undefined as string | undefined,
@@ -140,10 +131,10 @@ const creditRatingOptions = CREDIT_RATINGS.map((r) => ({ label: r, value: r }))
 const columns = [
   { title: '代码', key: 'code', dataIndex: 'code', width: 120, fixed: 'left' },
   { title: '简称', key: 'name', dataIndex: 'name', width: 180 },
-  { title: '品种', key: 'type', dataIndex: 'type', width: 100 },
-  { title: '票面利率', key: 'coupon_rate', dataIndex: 'coupon_rate', width: 100 },
-  { title: '剩余期限', key: 'remaining_term', dataIndex: 'remaining_term', width: 100 },
-  { title: '评级', dataIndex: 'rating', key: 'rating', width: 80 },
+  { title: '品种', key: 'type', width: 100 },
+  { title: '票面利率', key: 'coupon_rate', width: 100 },
+  { title: '剩余期限', key: 'remaining_term', width: 100 },
+  { title: '评级', dataIndex: 'creditRating', key: 'rating', width: 80 },
   { title: '发行人', dataIndex: 'issuer', key: 'issuer', ellipsis: true },
 ]
 
@@ -160,7 +151,8 @@ async function fetchBonds() {
       },
     })
     const data = res.data
-    bonds.value = data.items ?? data as unknown as Bond[] ?? []
+    const list = data.items ?? (data as unknown as BondRaw[]) ?? []
+    bonds.value = list.map(adaptBond)
     pagination.total = data.total ?? bonds.value.length
   } catch {
     bonds.value = []

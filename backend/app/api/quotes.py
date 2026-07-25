@@ -23,6 +23,7 @@ async def get_latest_quotes(
     query = (
         select(Quote, MarketSource.name, MarketSource.source_type)
         .join(MarketSource, Quote.source_id == MarketSource.id)
+        .where(MarketSource.is_enabled.is_(True))
     )
     if source_type:
         query = query.where(MarketSource.source_type == source_type)
@@ -54,6 +55,8 @@ async def get_best_quotes(
             func.min(Quote.ask_price).label("best_ask"),
             func.count(Quote.id).label("quote_count"),
         )
+        .join(MarketSource, Quote.source_id == MarketSource.id)
+        .where(MarketSource.is_enabled.is_(True))
         .group_by(Quote.bond_id)
         .subquery()
     )

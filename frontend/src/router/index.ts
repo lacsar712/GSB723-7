@@ -23,8 +23,8 @@ const router = createRouter({
         { path: 'futures', name: 'Futures', component: () => import('../views/FuturesView.vue') },
         { path: 'swaps', name: 'Swaps', component: () => import('../views/SwapsView.vue') },
         { path: 'favorites', name: 'Favorites', component: () => import('../views/FavoritesView.vue') },
-        { path: 'admin/users', name: 'AdminUsers', component: () => import('../views/admin/UserManagement.vue') },
-        { path: 'admin/sources', name: 'AdminSources', component: () => import('../views/admin/SourceManagement.vue') },
+        { path: 'admin/users', name: 'AdminUsers', component: () => import('../views/admin/UserManagement.vue'), meta: { requiresAdmin: true } },
+        { path: 'admin/sources', name: 'AdminSources', component: () => import('../views/admin/SourceManagement.vue'), meta: { requiresAdmin: true } },
       ],
     },
   ],
@@ -34,6 +34,9 @@ router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
   if (to.meta.requiresAuth !== false && !authStore.token) {
     next('/login')
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin()) {
+    // 非管理员访问管理路由，拦回看板
+    next('/dashboard')
   } else {
     next()
   }
